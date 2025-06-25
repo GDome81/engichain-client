@@ -62,23 +62,26 @@ class RelationshipService {
       console.log(`[RelationshipService] Children response status:`, childrenResponse.status);
       console.log(`[RelationshipService] Parents response status:`, parentsResponse.status);
 
-      const childData = childrenResponse.status === 'fulfilled' ? childrenResponse.value.data : null;
+      const children = childrenResponse.status === 'fulfilled' && Array.isArray(childrenResponse.value.data) ? childrenResponse.value.data : [];
       const parentData = parentsResponse.status === 'fulfilled' ? parentsResponse.value.data : null;
 
-      console.log(`[RelationshipService] Raw child data:`, childData);
+      console.log(`[RelationshipService] Processed children (${children.length}):`, children);
       console.log(`[RelationshipService] Raw parent data:`, parentData);
 
       const relationships = [];
 
-      // Add children relationships from the graph structure
-      if (childData && Array.isArray(childData.relationships)) {
-        childData.relationships.forEach(rel => {
+      // Add children relationships (this node -> child)
+      children.forEach(child => {
+        if (child && child.id) {
           relationships.push({
-            ...rel,
+            id: `${ownerId}-${child.id}`,
+            from: parseInt(ownerId, 10),
+            to: child.id,
+            label: 'contains',
             type: 'child'
           });
-        });
-      }
+        }
+      });
 
       // Add parent relationships from the graph structure
       if (parentData && Array.isArray(parentData.relationships)) {

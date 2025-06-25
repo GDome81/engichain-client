@@ -68,6 +68,18 @@ const GraphView = () => {
     }
   }, [categories, selectedCategory, currentFocusId]);
 
+  const [initialCenterDone, setInitialCenterDone] = useState(false);
+
+  useEffect(() => {
+    if (graphRef.current && graphData.nodes.length > 0 && !initialCenterDone) {
+      // Center the graph only once after the initial data load
+      setTimeout(() => {
+        graphRef.current.zoomToFit(400);
+        setInitialCenterDone(true);
+      }, 500);
+    }
+  }, [graphData, initialCenterDone]);
+
 
 
   const updateGraphDimensions = useCallback(() => {
@@ -109,9 +121,10 @@ const GraphView = () => {
         }
 
         const processNode = (item, category) => {
-          if (nodeMap.has(item.id)) return;
+          const nodeId = parseInt(item.id, 10);
+          if (nodeMap.has(nodeId)) return;
           const node = {
-            id: item.id,
+            id: nodeId,
             name: item.name,
             category: category.name,
             categoryId: category.id,
@@ -122,44 +135,41 @@ const GraphView = () => {
             fields: item.fields,
             val: 10,
             color: getCategoryColor(category.id),
+            expanded: parsedFocusId === nodeId, // The initial focused node is considered expanded
           };
           nodes.push(node);
-          nodeMap.set(item.id, node);
+          nodeMap.set(nodeId, node);
         };
 
         const focusCategory = categories.find(c => c.id === focusNodeData.categoryId) || { name: 'Sconosciuta', id: -1 };
         processNode(focusNodeData, focusCategory);
 
-        const relationships = await relationshipService.getRelationshipsByOwner(parsedFocusId);
-        console.log(`[GraphView] Found ${relationships.length} relationships for node ${parsedFocusId}:`, relationships);
+        const [childrenResponse, parentsResponse] = await Promise.all([
+          dataService.findChildren(parsedFocusId),
+          dataService.findParents(parsedFocusId),
+        ]);
 
-        for (const rel of relationships) {
-          let relatedNodeId;
-          if (rel.from === parsedFocusId) {
-            relatedNodeId = rel.to;
-            console.log(`[GraphView] Processing child relationship: ${rel.from} -> ${rel.to}`);
-          } else if (rel.to === parsedFocusId) {
-            relatedNodeId = rel.from;
-            console.log(`[GraphView] Processing parent relationship: ${rel.from} -> ${rel.to}`);
-          } else {
-            console.warn(`[GraphView] Skipping stray relationship not involving node ${parsedFocusId}:`, rel);
-            continue;
+        console.log(`[GraphView] Children response for ${parsedFocusId}:`, childrenResponse);
+        console.log(`[GraphView] Parents response for ${parsedFocusId}:`, parentsResponse);
+
+        const allRelatedNodes = [...(childrenResponse.nodes || []), ...(parentsResponse.nodes || [])];
+        const allRelationships = [...(childrenResponse.relationships || []), ...(parentsResponse.relationships || [])];
+
+        for (const nodeData of allRelatedNodes) {
+          const nodeId = parseInt(nodeData.id, 10);
+          if (!nodeMap.has(nodeId)) {
+            const category = categories.find(c => c.id === nodeData.categoryId) || { name: 'Sconosciuta', id: -1 };
+            processNode(nodeData, category);
           }
+        }
 
-          if (!nodeMap.has(relatedNodeId)) {
-            try {
-              const relatedNodeData = await dataService.findDataById(relatedNodeId);
-              const relatedCategory = categories.find(c => c.id === relatedNodeData.categoryId) || { name: 'Sconosciuta', id: -1 };
-              processNode(relatedNodeData, relatedCategory);
-            } catch (error) {
-              console.error(`Error loading related node ${relatedNodeId}:`, error);
-            }
-          }
-
-          if (nodeMap.has(rel.from) && nodeMap.has(rel.to)) {
+        for (const rel of allRelationships) {
+          const fromId = parseInt(rel.from, 10);
+          const toId = parseInt(rel.to, 10);
+          if (nodeMap.has(fromId) && nodeMap.has(toId)) {
             links.push({
-              source: rel.from,
-              target: rel.to,
+              source: fromId,
+              target: toId,
               label: rel.label || 'related',
               id: rel.id,
             });
@@ -176,12 +186,14 @@ const GraphView = () => {
           const categoryData = dataResponse.content || [];
 
           for (const item of categoryData) {
-            if (processedItems.has(item.id)) continue;
-            processedItems.add(item.id);
+            const itemId = parseInt(item.id, 10);
+            if (processedItems.has(itemId)) continue;
+            processedItems.add(itemId);
 
             const fullItem = await dataService.findDataById(item.id);
+            const nodeId = parseInt(fullItem.id, 10);
             const node = {
-              id: fullItem.id,
+              id: nodeId,
               name: fullItem.name,
               category: category.name,
               categoryId: category.id,
@@ -192,21 +204,25 @@ const GraphView = () => {
               fields: fullItem.fields,
               val: 10,
               color: getCategoryColor(category.id),
+              expanded: false,
             };
             nodes.push(node);
-            nodeMap.set(fullItem.id, node);
+            nodeMap.set(nodeId, node);
           }
 
           for (const item of categoryData) {
-            if (loadedRelationships.has(item.id)) continue;
-            loadedRelationships.add(item.id);
+            const itemId = parseInt(item.id, 10);
+            if (loadedRelationships.has(itemId)) continue;
+            loadedRelationships.add(itemId);
 
             const relationships = await relationshipService.getRelationshipsByOwner(item.id);
             relationships.forEach(rel => {
-              if (nodeMap.has(rel.from) && nodeMap.has(rel.to)) {
+              const fromId = parseInt(rel.from, 10);
+              const toId = parseInt(rel.to, 10);
+              if (nodeMap.has(fromId) && nodeMap.has(toId)) {
                 links.push({
-                  source: rel.from,
-                  target: rel.to,
+                  source: fromId,
+                  target: toId,
                   label: rel.label || 'related',
                   id: rel.id,
                 });
@@ -237,11 +253,166 @@ const GraphView = () => {
     return colors[categoryId % colors.length];
   };
 
+  const expandNode = async (nodeId) => {
+    try {
+      const currentNode = graphData.nodes.find(n => n.id === nodeId);
+      if (currentNode && currentNode.expanded) {
+        toast.info(`Nodo ${currentNode.name} già espanso.`);
+        return;
+      }
+
+      setLoading(true);
+
+      const [childrenResponse, parentsResponse] = await Promise.all([
+        dataService.findChildren(nodeId),
+        dataService.findParents(nodeId),
+      ]);
+
+      const newNodes = [...graphData.nodes];
+      const newLinks = [...graphData.links];
+      const nodeMap = new Map(newNodes.map(n => [n.id, n]));
+
+      const getLinkId = (link) => {
+        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+        return `${sourceId}:${targetId}`;
+      };
+      const linkSet = new Set(newLinks.map(getLinkId));
+
+      const allRelatedNodes = [...(childrenResponse.nodes || []), ...(parentsResponse.nodes || [])];
+      const allRelationships = [...(childrenResponse.relationships || []), ...(parentsResponse.relationships || [])];
+
+      let addedNodesCount = 0;
+      // Process each related node and fetch complete data including blockchainInfoEntities
+      for (const item of allRelatedNodes) {
+        const itemId = parseInt(item.id, 10);
+        if (!nodeMap.has(itemId)) {
+          addedNodesCount++;
+          
+          // Fetch complete node data to get accurate blockchainInfoEntities
+          try {
+            const fullItem = await dataService.findDataById(item.id);
+            const category = categories.find(c => c.id === fullItem.categoryId) || { name: 'Sconosciuta', id: -1 };
+            const node = {
+              id: itemId,
+              name: fullItem.name,
+              category: category.name,
+              categoryId: category.id,
+              certified: fullItem.blockchainInfoEntities && fullItem.blockchainInfoEntities.length > 0,
+              blockchainInfoEntities: fullItem.blockchainInfoEntities || [],
+              public: fullItem.public,
+              creationDate: fullItem.creationDate,
+              fields: fullItem.fields,
+              val: 10,
+              color: getCategoryColor(category.id),
+              expanded: false
+            };
+            newNodes.push(node);
+            nodeMap.set(itemId, node);
+          } catch (error) {
+            console.error(`Error fetching complete data for node ${item.id}:`, error);
+            // Fallback to original item data if fetch fails
+            const category = categories.find(c => c.id === item.categoryId) || { name: 'Sconosciuta', id: -1 };
+            const node = {
+              id: itemId,
+              name: item.name,
+              category: category.name,
+              categoryId: category.id,
+              certified: item.blockchainInfoEntities && item.blockchainInfoEntities.length > 0,
+              blockchainInfoEntities: item.blockchainInfoEntities || [],
+              public: item.public,
+              creationDate: item.creationDate,
+              fields: item.fields,
+              val: 10,
+              color: getCategoryColor(category.id),
+              expanded: false
+            };
+            newNodes.push(node);
+            nodeMap.set(itemId, node);
+          }
+        }
+      }
+
+      let addedLinksCount = 0;
+      allRelationships.forEach(rel => {
+        const fromId = parseInt(rel.from, 10);
+        const toId = parseInt(rel.to, 10);
+        const linkId = `${fromId}:${toId}`;
+        if (nodeMap.has(fromId) && nodeMap.has(toId) && !linkSet.has(linkId)) {
+          addedLinksCount++;
+          newLinks.push({
+            source: fromId,
+            target: toId,
+            label: rel.label || 'related',
+            id: rel.id,
+          });
+          linkSet.add(linkId);
+        }
+      });
+
+      const clickedNodeIndex = newNodes.findIndex(n => n.id === nodeId);
+      if (clickedNodeIndex !== -1) {
+        newNodes[clickedNodeIndex] = { ...newNodes[clickedNodeIndex], expanded: true };
+      }
+
+      if (addedNodesCount === 0 && addedLinksCount === 0 && currentNode) {
+        toast.info(`Nessun nuovo nodo o relazione da aggiungere per ${currentNode.name}.`);
+        return; // Don't update graph data if nothing was added
+      }
+
+      // Preserve existing node positions to prevent repositioning
+      if (graphRef.current) {
+        const currentGraphData = graphRef.current.graphData();
+        if (currentGraphData && currentGraphData.nodes) {
+          currentGraphData.nodes.forEach(existingNode => {
+            const nodeIndex = newNodes.findIndex(n => n.id === existingNode.id);
+            if (nodeIndex !== -1 && existingNode.x !== undefined && existingNode.y !== undefined) {
+              newNodes[nodeIndex] = {
+                ...newNodes[nodeIndex],
+                x: existingNode.x,
+                y: existingNode.y,
+                vx: existingNode.vx || 0,
+                vy: existingNode.vy || 0
+              };
+            }
+          });
+        }
+      }
+
+      // Update graph data with proper link references
+      setGraphData({ nodes: newNodes, links: newLinks });
+      setAvailableNodes(newNodes);
+      
+      // Force graph refresh to update link connections
+      if (graphRef.current) {
+        setTimeout(() => {
+          if (graphRef.current) {
+            graphRef.current.refresh();
+          }
+        }, 100);
+      }
+
+    } catch (error) {
+      console.error(`Error expanding node ${nodeId}:`, error);
+      toast.error('Errore nell\'espansione del nodo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleNodeClick = (node) => {
     if (node) {
       console.log(`[GraphView] Node clicked:`, node);
       setSelectedNode(node);
-      setCurrentFocusId(node.id);
+      expandNode(node.id);
+    }
+  };
+
+  const handleNodeRightClick = (node, event) => {
+    event.preventDefault(); // Impedisce il menu contestuale del browser
+    if (node) {
+      console.log(`[GraphView] Node right-clicked:`, node);
+      navigate(`/data/${node.id}`);
     }
   };
 
@@ -292,31 +463,46 @@ const GraphView = () => {
     const label = node.name;
     const fontSize = 12 / globalScale;
     ctx.font = `${fontSize}px Sans-Serif`;
-    
-    // Draw node circle
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, node.val, 0, 2 * Math.PI, false);
+
+    // Check if node is certified based on blockchainInfoEntities
+    // Now that we fetch complete data, we can rely on blockchainInfoEntities
+    const isCertified = node.blockchainInfoEntities && node.blockchainInfoEntities.length > 0;
+
+    // Draw node shape
     ctx.fillStyle = node.color;
-    ctx.fill();
     
-    // Add border for certified nodes
-    if (node.certified) {
-      ctx.strokeStyle = '#4caf50';
-      ctx.lineWidth = 3 / globalScale;
-      ctx.stroke();
+    if (isCertified) {
+        // Draw square for certified nodes
+        const size = node.val * 2.2; // Larger square for better visibility
+        ctx.fillRect(node.x - size / 2, node.y - size / 2, size, size);
+        
+        // Black border for certified nodes
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3 / globalScale;
+        ctx.strokeRect(node.x - size / 2, node.y - size / 2, size, size);
+    } else {
+        // Draw circle for non-certified nodes
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, node.val, 0, 2 * Math.PI, false);
+        ctx.fill();
+        
+        // Yellow border for non-certified nodes
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2 / globalScale;
+        ctx.stroke();
     }
-    
+
     // Draw label
     const textWidth = ctx.measureText(label).width;
     const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2);
-    
+
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
     ctx.fillRect(
       node.x - bckgDimensions[0] / 2,
       node.y - bckgDimensions[1] / 2,
       ...bckgDimensions
     );
-    
+
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#333';
@@ -422,8 +608,8 @@ const GraphView = () => {
                 </Box>
                 <Box mb={1}>
                   <Chip
-                    label={selectedNode.certified ? 'Certificato' : 'Non Certificato'}
-                    color={selectedNode.certified ? 'success' : 'warning'}
+                    label={selectedNode.blockchainInfoEntities && selectedNode.blockchainInfoEntities.length > 0 ? 'Certificato' : 'Non Certificato'}
+                    color={selectedNode.blockchainInfoEntities && selectedNode.blockchainInfoEntities.length > 0 ? 'success' : 'warning'}
                     size="small"
                   />
                 </Box>
@@ -432,14 +618,7 @@ const GraphView = () => {
                 </Typography>
                 
                 {/* Certificazioni Blockchain */}
-                {(() => {
-                  console.log('[GraphView] Rendering certifications check:');
-                  console.log('[GraphView] selectedNode.certified:', selectedNode.certified);
-                  console.log('[GraphView] selectedNode.blockchainInfoEntities:', selectedNode.blockchainInfoEntities);
-                  console.log('[GraphView] blockchainInfoEntities length:', selectedNode.blockchainInfoEntities?.length);
-                  return null;
-                })()}
-                {selectedNode.certified && selectedNode.blockchainInfoEntities && selectedNode.blockchainInfoEntities.length > 0 && (
+                {selectedNode.blockchainInfoEntities && selectedNode.blockchainInfoEntities.length > 0 && (
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="subtitle2" color="success.dark" gutterBottom>
                       🔗 Certificazioni Blockchain
@@ -507,15 +686,25 @@ const GraphView = () => {
               nodeLabel="name"
               nodeVal="val"
               nodeColor="color"
-              linkDirectionalArrowLength={5}
-              linkDirectionalArrowRelPos={1}
+              nodeId="id"
+              linkSource="source"
+              linkTarget="target"
+              linkDirectionalArrowLength={8}
+              linkDirectionalArrowRelPos={0.9}
               linkLabel="label"
+              linkWidth={2}
+              linkColor={() => '#999'}
               width={graphDimensions.width}
               height={graphDimensions.height}
               nodeCanvasObject={nodeCanvasObject}
               onNodeClick={handleNodeClick}
+              onNodeRightClick={handleNodeRightClick}
               onNodeDoubleClick={handleNodeDoubleClick}
+              linkDirectionalParticles={2}
+              linkDirectionalParticleWidth={2}
               cooldownTicks={100}
+              d3AlphaDecay={0.02}
+              d3VelocityDecay={0.3}
               onEngineStop={() => {
                 const parsedFocusId = currentFocusId ? parseInt(currentFocusId, 10) : null;
                 if (parsedFocusId && graphRef.current) {
@@ -523,8 +712,12 @@ const GraphView = () => {
                   if (focusNode) {
                     const neighborIds = new Set([parsedFocusId]);
                     graphData.links.forEach(link => {
-                      if (link.source === parsedFocusId) neighborIds.add(link.target);
-                      if (link.target === parsedFocusId) neighborIds.add(link.source);
+                      // Handle both cases: when source/target are IDs or node objects
+                      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                      
+                      if (sourceId === parsedFocusId) neighborIds.add(targetId);
+                      if (targetId === parsedFocusId) neighborIds.add(sourceId);
                     });
 
                     if (neighborIds.size > 1) {
@@ -590,7 +783,7 @@ const GraphView = () => {
             </Grid>
           </Grid>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            • Click per selezionare un nodo • Click destro per visualizzare i dettagli • Trascina per spostare i nodi
+            • Click per selezionare un nodo • Click destro o doppio click per visualizzare i dettagli • Trascina per spostare i nodi
           </Typography>
         </Paper>
       )}

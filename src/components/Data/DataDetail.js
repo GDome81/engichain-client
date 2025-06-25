@@ -62,15 +62,63 @@ const DataDetail = () => {
 
   useEffect(() => {
     if (id) {
-      loadDataDetail();
-      loadRelationships();
-      loadChildren();
+      loadAllData();
     }
   }, [id]);
 
+  const loadAllData = async () => {
+    setLoading(true);
+    try {
+      const [dataResponse, childrenResponse, relationshipsResponse] = await Promise.all([
+        dataService.findDataById(id),
+        dataService.findChildren(id),
+        relationshipService.getRelationshipsByOwner(id),
+      ]);
+
+      console.log('[DataDetail] Loaded data:', dataResponse);
+      setData(dataResponse);
+
+      console.log('[DataDetail] Loaded children:', childrenResponse);
+      setChildren(childrenResponse.nodes || []);
+
+      console.log('[DataDetail] Loaded relationships:', relationshipsResponse);
+      const relationships = Array.isArray(relationshipsResponse) ? relationshipsResponse : [];
+      setRelationships(relationships);
+
+      const relatedIds = new Set();
+      relationships.forEach(rel => {
+        if (rel.from !== parseInt(id)) relatedIds.add(rel.from);
+        if (rel.to !== parseInt(id)) relatedIds.add(rel.to);
+      });
+
+      console.log(`[DataDetail] Related IDs to load:`, Array.from(relatedIds));
+
+      if (relatedIds.size > 0) {
+        const relatedEntitiesPromises = Array.from(relatedIds).map(entityId =>
+          dataService.findDataById(entityId).catch(error => {
+            console.error(`[DataDetail] Error loading entity ${entityId}:`, error);
+            return null; // Return null if an entity fails to load
+          })
+        );
+        const loadedEntities = await Promise.all(relatedEntitiesPromises);
+        const validEntities = loadedEntities.filter(entity => entity !== null);
+        setRelatedEntities(validEntities);
+        console.log(`[DataDetail] Set related entities (${validEntities.length}):`, validEntities);
+      } else {
+        setRelatedEntities([]);
+      }
+
+    } catch (error) {
+      console.error('Error loading data details:', error);
+      toast.error('Errore nel caricamento dei dettagli dell\'entità.');
+      navigate('/data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadDataDetail = async () => {
     try {
-      setLoading(true);
       const response = await dataService.findDataById(id);
       console.log('[DataDetail] Loaded data:', response);
       setData(response);
@@ -78,58 +126,6 @@ const DataDetail = () => {
       console.error('Error loading data detail:', error);
       toast.error('Errore nel caricamento dei dettagli');
       navigate('/data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadChildren = async () => {
-    try {
-      const response = await dataService.findChildren(id);
-      setChildren(response || []);
-    } catch (error) {
-      console.error('Error loading children data:', error);
-    }
-  };
-
-  const loadRelationships = async () => {
-    try {
-      console.log(`[DataDetail] Loading relationships for ID: ${id}`);
-      const response = await relationshipService.getRelationshipsByOwner(id);
-      console.log(`[DataDetail] Relationships response:`, response);
-      
-      // Ensure response is an array
-      const relationships = Array.isArray(response) ? response : [];
-      setRelationships(relationships);
-      console.log(`[DataDetail] Set relationships (${relationships.length}):`, relationships);
-      
-      // Load related entities
-      const relatedIds = new Set();
-      relationships.forEach(rel => {
-        if (rel.from !== parseInt(id)) relatedIds.add(rel.from);
-        if (rel.to !== parseInt(id)) relatedIds.add(rel.to);
-      });
-      
-      console.log(`[DataDetail] Related IDs to load:`, Array.from(relatedIds));
-      
-      const entities = [];
-      for (const entityId of relatedIds) {
-        try {
-          const entity = await dataService.findDataById(entityId);
-          entities.push(entity);
-          console.log(`[DataDetail] Loaded entity ${entityId}:`, entity);
-        } catch (error) {
-          console.error(`[DataDetail] Error loading entity ${entityId}:`, error);
-        }
-      }
-      setRelatedEntities(entities);
-      console.log(`[DataDetail] Set related entities (${entities.length}):`, entities);
-    } catch (error) {
-      console.error('[DataDetail] Error loading relationships:', {
-        message: error.message,
-        status: error.status,
-        error: error
-      });
     }
   };
 
@@ -241,7 +237,7 @@ const DataDetail = () => {
         <Box display="flex" gap={1}>
           {getStatusChip()}
 
-          {children.length === 0 && (
+          {!isCertified && children.length === 0 && (
             <Button
               variant="outlined"
               color="error"
