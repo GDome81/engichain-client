@@ -321,53 +321,20 @@ const DataForm = () => {
                         <CardContent>
                           <Grid container spacing={2} alignItems="center">
                             <Grid item xs={12} sm={3}>
-                              <TextField
-                      {...register(`fields.${index}.name`)}
-                      label="Nome Campo"
-                      fullWidth
-                      required
-                      error={!!errors.fields?.[index]?.name}
-                      helperText={errors.fields?.[index]?.name?.message}
-                      variant="outlined"
-                    />
+                              <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>{field.name}</Typography>
+                              <Typography variant="caption" color="textSecondary">{field.type}</Typography>
                             </Grid>
-                            <Grid item xs={12} sm={5}>
+                            <Grid item xs={12} sm={7}>
                               <TextField
-                      {...register(`fields.${index}.value`)}
-                      label="Valore"
-                      fullWidth
-                      error={!!errors.fields?.[index]?.value}
-                      helperText={errors.fields?.[index]?.value?.message}
-                      variant="outlined"
-                    />
-                            </Grid>
-                            <Grid item xs={12} sm={2}>
-                              <TextField
+                                {...register(`fields.${index}.value`)}
+                                label="Valore"
                                 fullWidth
-                                label="Tipo"
-                                select
-                                {...register(`fields.${index}.type`)}
-                                defaultValue="text"
-                                disabled={field.isFromCategory}
-                              >
-                                <MenuItem value="text">Testo</MenuItem>
-                                <MenuItem value="number">Numero</MenuItem>
-                                <MenuItem value="date">Data</MenuItem>
-                                <MenuItem value="email">Email</MenuItem>
-                                <MenuItem value="url">URL</MenuItem>
-                                <MenuItem value="textarea">Testo Lungo</MenuItem>
-                              </TextField>
+                                error={!!errors.fields?.[index]?.value}
+                                helperText={errors.fields?.[index]?.value?.message}
+                                variant="outlined"
+                              />
                             </Grid>
-                            <Grid item xs={12} sm={2}>
-                              <IconButton
-                                color="error"
-                                onClick={() => remove(index)}
-                                disabled={loading}
-                                size="large"
-                              >
-                                <DeleteIcon />
-                              </IconButton>
-                            </Grid>
+
                           </Grid>
                         </CardContent>
                       </Card>
