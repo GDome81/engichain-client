@@ -120,29 +120,53 @@ const GraphView = () => {
           return;
         }
 
-        const processNode = (item, category) => {
+        const processNode = async (item, category) => {
           const nodeId = parseInt(item.id, 10);
           if (nodeMap.has(nodeId)) return;
-          const node = {
-            id: nodeId,
-            name: item.name,
-            category: category.name,
-            categoryId: category.id,
-            certified: item.blockchainInfoEntities && item.blockchainInfoEntities.length > 0,
-            blockchainInfoEntities: item.blockchainInfoEntities || [],
-            public: item.public,
-            creationDate: item.creationDate,
-            fields: item.fields,
-            val: 10,
-            color: getCategoryColor(category.id),
-            expanded: parsedFocusId === nodeId, // The initial focused node is considered expanded
-          };
-          nodes.push(node);
-          nodeMap.set(nodeId, node);
+          
+          // Always fetch complete data to ensure accurate certification status
+          try {
+            const fullItem = await dataService.findDataById(item.id);
+            const node = {
+              id: nodeId,
+              name: fullItem.name,
+              category: category.name,
+              categoryId: category.id,
+              certified: fullItem.blockchainInfoEntities && fullItem.blockchainInfoEntities.length > 0,
+              blockchainInfoEntities: fullItem.blockchainInfoEntities || [],
+              public: fullItem.public,
+              creationDate: fullItem.creationDate,
+              fields: fullItem.fields,
+              val: 10,
+              color: getCategoryColor(category.id),
+              expanded: parsedFocusId === nodeId, // The initial focused node is considered expanded
+            };
+            nodes.push(node);
+            nodeMap.set(nodeId, node);
+          } catch (error) {
+            console.error(`Error fetching complete data for node ${item.id}:`, error);
+            // Fallback to original item data if fetch fails
+            const node = {
+              id: nodeId,
+              name: item.name,
+              category: category.name,
+              categoryId: category.id,
+              certified: item.blockchainInfoEntities && item.blockchainInfoEntities.length > 0,
+              blockchainInfoEntities: item.blockchainInfoEntities || [],
+              public: item.public,
+              creationDate: item.creationDate,
+              fields: item.fields,
+              val: 10,
+              color: getCategoryColor(category.id),
+              expanded: parsedFocusId === nodeId, // The initial focused node is considered expanded
+            };
+            nodes.push(node);
+            nodeMap.set(nodeId, node);
+          }
         };
 
         const focusCategory = categories.find(c => c.id === focusNodeData.categoryId) || { name: 'Sconosciuta', id: -1 };
-        processNode(focusNodeData, focusCategory);
+        await processNode(focusNodeData, focusCategory);
 
         const [childrenResponse, parentsResponse] = await Promise.all([
           dataService.findChildren(parsedFocusId),
@@ -159,7 +183,7 @@ const GraphView = () => {
           const nodeId = parseInt(nodeData.id, 10);
           if (!nodeMap.has(nodeId)) {
             const category = categories.find(c => c.id === nodeData.categoryId) || { name: 'Sconosciuta', id: -1 };
-            processNode(nodeData, category);
+            await processNode(nodeData, category);
           }
         }
 
@@ -190,6 +214,7 @@ const GraphView = () => {
             if (processedItems.has(itemId)) continue;
             processedItems.add(itemId);
 
+            // Always fetch complete data to ensure accurate certification status
             const fullItem = await dataService.findDataById(item.id);
             const nodeId = parseInt(fullItem.id, 10);
             const node = {
@@ -380,16 +405,35 @@ const GraphView = () => {
       }
 
       // Update graph data with proper link references
-      setGraphData({ nodes: newNodes, links: newLinks });
-      setAvailableNodes(newNodes);
+      const updatedGraphData = { nodes: newNodes, links: newLinks };
       
-      // Force graph refresh to update link connections
+      // Force complete graph data update to maintain link integrity
       if (graphRef.current) {
+        // Stop current simulation completely
+        graphRef.current.pauseAnimation();
+        
+        // Clear existing data and set new data
+        graphRef.current.graphData({ nodes: [], links: [] });
+        
+        // Wait a moment then set the new data
         setTimeout(() => {
           if (graphRef.current) {
-            graphRef.current.refresh();
+            graphRef.current.graphData(updatedGraphData);
+            setGraphData(updatedGraphData);
+            setAvailableNodes(newNodes);
+            
+            // Restart simulation with fresh state
+            setTimeout(() => {
+              if (graphRef.current) {
+                graphRef.current.resumeAnimation();
+                graphRef.current.reheatSimulation();
+              }
+            }, 100);
           }
-        }, 100);
+        }, 50);
+      } else {
+        setGraphData(updatedGraphData);
+        setAvailableNodes(newNodes);
       }
 
     } catch (error) {
@@ -689,22 +733,32 @@ const GraphView = () => {
               nodeId="id"
               linkSource="source"
               linkTarget="target"
-              linkDirectionalArrowLength={8}
-              linkDirectionalArrowRelPos={0.9}
+              linkDirectionalArrowLength={6}
+              linkDirectionalArrowRelPos={0.99}
               linkLabel="label"
               linkWidth={2}
-              linkColor={() => '#999'}
+              linkColor={() => '#666'}
               width={graphDimensions.width}
               height={graphDimensions.height}
               nodeCanvasObject={nodeCanvasObject}
               onNodeClick={handleNodeClick}
               onNodeRightClick={handleNodeRightClick}
               onNodeDoubleClick={handleNodeDoubleClick}
-              linkDirectionalParticles={2}
-              linkDirectionalParticleWidth={2}
-              cooldownTicks={100}
-              d3AlphaDecay={0.02}
-              d3VelocityDecay={0.3}
+              linkDirectionalParticles={1}
+              linkDirectionalParticleWidth={3}
+              linkDirectionalParticleSpeed={0.006}
+              cooldownTicks={150}
+              d3AlphaDecay={0.015}
+              d3VelocityDecay={0.4}
+              d3ReheatSimulation={false}
+              enableNodeDrag={true}
+              enableZoomInteraction={true}
+              enablePanInteraction={true}
+              linkCurvature={0}
+              linkForceStrength={1}
+              linkDistance={50}
+              chargeStrength={-200}
+              nodeRelSize={6}
               onEngineStop={() => {
                 const parsedFocusId = currentFocusId ? parseInt(currentFocusId, 10) : null;
                 if (parsedFocusId && graphRef.current) {
@@ -733,7 +787,6 @@ const GraphView = () => {
                   graphRef.current.zoomToFit(400);
                 }
               }}
-              linkCurvature={0.25}
             />
           </Paper>
         </Grid>
