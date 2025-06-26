@@ -1,44 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Alert,
   Box,
-  Typography,
-  Paper,
-  Grid,
+  Button,
   Card,
   CardContent,
-  Button,
   Chip,
-  Alert,
   CircularProgress,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
-  TextField,
+  DialogContent,
+  DialogTitle,
+  Divider,
   FormControl,
+  Grid,
+  IconButton,
   InputLabel,
-  Select,
-  MenuItem,
   List,
   ListItem,
   ListItemText,
-  Divider,
-  IconButton,
+  MenuItem,
+  Paper,
+  Select,
+  TextField,
+  Typography,
 } from '@mui/material';
 import {
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Verified as VerifiedIcon,
-  Security as SecurityIcon,
-  Link as LinkIcon,
   ArrowBack as ArrowBackIcon,
+  Delete as DeleteIcon,
+  Edit as EditIcon,
+  Link as LinkIcon,
+  Security as SecurityIcon,
   Share as ShareIcon,
+  Verified as VerifiedIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import dataService from '../../services/dataService';
 import blockchainService from '../../services/blockchainService';
 import relationshipService from '../../services/relationshipService';
+import categoryService from '../../services/categoryService';
 import { toast } from 'react-toastify';
 
 const DataDetail = () => {
@@ -50,6 +51,13 @@ const DataDetail = () => {
   const [children, setChildren] = useState([]);
   const [showCertifyDialog, setShowCertifyDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [availableToLink, setAvailableToLink] = useState([]);
+  const [linkTargetId, setLinkTargetId] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [linkDirection, setLinkDirection] = useState('from-to');
+
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -219,6 +227,61 @@ const DataDetail = () => {
 
   const isCertified = data.blockchainInfoEntities && data.blockchainInfoEntities.length > 0;
 
+  const handleOpenLinkDialog = async () => {
+    try {
+      const categoriesResponse = await categoryService.getCategories(0, 1000);
+      setCategories(categoriesResponse.content || []);
+      setShowLinkDialog(true);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      toast.error('Errore nel caricamento delle categorie.');
+    }
+  };
+
+  const handleCategoryChange = async (categoryId) => {
+    setSelectedCategoryId(categoryId);
+    setLinkTargetId('');
+    if (categoryId) {
+      try {
+        const response = await dataService.findDataByCategory(categoryId, 0, 1000);
+        const allNodes = response.content || [];
+        setAvailableToLink(allNodes.filter(node => node.id !== parseInt(id)));
+      } catch (error) {
+        console.error('Error loading entities for linking:', error);
+        toast.error('Errore nel caricamento delle entità per il collegamento.');
+      }
+    } else {
+      setAvailableToLink([]);
+    }
+  };
+
+  const handleCreateLink = async () => {
+    if (!linkTargetId) {
+      toast.error('Seleziona un\'entità di destinazione.');
+      return;
+    }
+
+    const fromId = linkDirection === 'from-to' ? parseInt(id) : parseInt(linkTargetId);
+    const toId = linkDirection === 'from-to' ? parseInt(linkTargetId) : parseInt(id);
+
+    const relationship = {
+      from: fromId,
+      to: toId,
+      owner: parseInt(id),
+    };
+
+    try {
+      await relationshipService.createRelationship(relationship);
+      toast.success('Relazione creata con successo!');
+      setShowLinkDialog(false);
+      setLinkTargetId('');
+      loadAllData(); // Refresh data to show the new relationship
+    } catch (error) {
+      console.error('Error creating relationship:', error);
+      toast.error('Errore nella creazione della relazione.');
+    }
+  };
+
   return (
     <Box className="fade-in" sx={{ p: 3 }}>
       {/* Header */}
@@ -363,6 +426,16 @@ const DataDetail = () => {
               Azioni
             </Typography>
             <Box display="flex" flexDirection="column" gap={2}>
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={<LinkIcon />}
+                onClick={handleOpenLinkDialog}
+                className="modern-button"
+              >
+                Collega Entità
+              </Button>
+
               {!isCertified && (
                 <Button
                   variant="contained"
@@ -485,6 +558,66 @@ const DataDetail = () => {
           )}
         </Grid>
       </Grid>
+
+      {/* Link Entity Dialog */}
+      <Dialog open={showLinkDialog} onClose={() => setShowLinkDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Collega a un'altra Entità</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <FormControl fullWidth sx={{ mb: 3 }}>
+              <InputLabel>Categoria</InputLabel>
+              <Select
+                value={selectedCategoryId}
+                label="Categoria"
+                onChange={(e) => handleCategoryChange(e.target.value)}
+              >
+                {categories.map((cat) => (
+                  <MenuItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {selectedCategoryId && (
+              <FormControl fullWidth sx={{ mb: 3 }}>
+                <InputLabel>Entità di Destinazione</InputLabel>
+                <Select
+                  value={linkTargetId}
+                  label="Entità di Destinazione"
+                  onChange={(e) => setLinkTargetId(e.target.value)}
+                  disabled={!availableToLink.length}
+                >
+                  {availableToLink.map((node) => (
+                    <MenuItem key={node.id} value={node.id}>
+                      {node.name} (ID: {node.id})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+
+
+            <FormControl fullWidth sx={{ mb: 3 }}>
+              <InputLabel>Direzione</InputLabel>
+              <Select
+                value={linkDirection}
+                label="Direzione"
+                onChange={(e) => setLinkDirection(e.target.value)}
+              >
+                <MenuItem value="from-to">Questa Entità → Entità di Destinazione</MenuItem>
+                <MenuItem value="to-from">Entità di Destinazione → Questa Entità</MenuItem>
+              </Select>
+            </FormControl>
+
+
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowLinkDialog(false)}>Annulla</Button>
+          <Button onClick={handleCreateLink} variant="contained">Crea Collegamento</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Certify Dialog */}
       <Dialog open={showCertifyDialog} onClose={() => setShowCertifyDialog(false)} maxWidth="sm" fullWidth>

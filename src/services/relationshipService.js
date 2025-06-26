@@ -2,7 +2,7 @@ import apiClient from './apiService';
 
 class RelationshipService {
   constructor() {
-    this.baseUrl = '/relationship';
+    this.baseUrl = '/data/relationship';
   }
 
   // Create a single relationship
@@ -18,7 +18,7 @@ class RelationshipService {
   // Create multiple relationships
   async createRelationships(relationships) {
     try {
-      const response = await apiClient.post(`${this.baseUrl}/list`, relationships);
+      const response = await apiClient.post('/data/relationships', relationships);
       return response.data;
     } catch (error) {
       throw this.handleError(error);
