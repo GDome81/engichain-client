@@ -17,6 +17,8 @@ import {
   Pagination,
   TextField,
   InputAdornment,
+  Paper,
+  Avatar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -168,13 +170,13 @@ const DataList = () => {
   }
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+    <Box className="fade-in">
+      <Box sx={{ mb: 4 }}>
         <Box>
-          <Typography variant="h4" gutterBottom>
+          <Typography variant="h3" className="gradient-text" sx={{ fontWeight: 800, mb: 1 }}>
             Entità
           </Typography>
-          <Typography variant="subtitle1" color="textSecondary">
+          <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 400, opacity: 0.8 }}>
             Gestisci le tue entità certificate su blockchain
           </Typography>
         </Box>
@@ -182,15 +184,17 @@ const DataList = () => {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => navigate('/data/new')}
+          className="modern-button"
         >
           Crea Entità
         </Button>
       </Box>
 
       {/* Filters */}
-      <Grid container spacing={2} mb={3}>
+      <Paper className="modern-form" sx={{ p: 3, mb: 4 }}>
+        <Grid container spacing={3}>
         <Grid item xs={12} sm={6} md={4}>
-          <FormControl fullWidth>
+          <FormControl fullWidth variant="outlined">
             <InputLabel>Categoria</InputLabel>
             <Select
               value={selectedCategory}
@@ -211,19 +215,22 @@ const DataList = () => {
         <Grid item xs={12} sm={6} md={4}>
           <TextField
             fullWidth
-            label="Cerca entità"
+            variant="outlined"
+            placeholder="Cerca per nome..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon />
+                  <SearchIcon color="primary" />
                 </InputAdornment>
               ),
+              sx: { borderRadius: '12px' }
             }}
           />
         </Grid>
       </Grid>
+      </Paper>
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -247,27 +254,16 @@ const DataList = () => {
           <Grid container spacing={3}>
             {filteredData.map((item) => (
               <Grid item xs={12} sm={6} md={4} key={item.id}>
-                <Card
-                  sx={{
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: 4,
-                    },
-                  }}
-                >
-                  <CardContent sx={{ flexGrow: 1 }}>
+                <Card className="modern-card" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <CardContent sx={{ flexGrow: 1, p: 3, position: 'relative' }}>
                     <Box display="flex" alignItems="center" mb={2}>
-                      <DataIcon color="primary" sx={{ mr: 1 }} />
-                      <Typography variant="h6" component="h2" noWrap>
+                      <Avatar sx={{ width: 48, height: 48, background: 'linear-gradient(135deg, #667eea, #764ba2)', boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)', mr: 2 }}><DataIcon /></Avatar>
+                      <Typography variant="h6" component="h2" noWrap sx={{ fontWeight: 700 }}>
                         {item.name}
                       </Typography>
                     </Box>
 
-                    <Box mb={2}>
+                    <Box sx={{ position: 'absolute', top: 16, right: 16 }}>
                       {getStatusChip(item)}
                     </Box>
 
@@ -293,11 +289,11 @@ const DataList = () => {
 
                   <CardActions>
                     <Button
-                      size="small"
-                      variant="outlined"
+                      variant="contained"
                       startIcon={<ViewIcon />}
                       onClick={() => handleViewDetails(item.id)}
                       fullWidth
+                      className="modern-button"
                     >
                       Visualizza
                     </Button>
@@ -308,8 +304,8 @@ const DataList = () => {
           </Grid>
 
           {totalPages > 1 && (
-            <Box display="flex" justifyContent="center" mt={4}>
-              <Pagination
+                      <Box display="flex" justifyContent="center" mt={4}>
+                            <Pagination
                 count={totalPages}
                 page={currentPage}
                 onChange={handlePageChange}

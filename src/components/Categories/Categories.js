@@ -10,11 +10,13 @@ import {
   Chip,
   CircularProgress,
   Alert,
+  Avatar,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Verified as VerifiedIcon,
   Category as CategoryIcon,
+  Pending as PendingIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import categoryService from '../../services/categoryService';
@@ -61,10 +63,12 @@ const Categories = () => {
     const isCertified = category.blockchainInfoEntities && category.blockchainInfoEntities.length > 0;
     return (
       <Chip
-        icon={<VerifiedIcon />}
-        label={isCertified ? 'Certificata' : 'Non Certificata'}
-        color={isCertified ? 'success' : 'default'}
+        icon={isCertified ? <VerifiedIcon /> : <PendingIcon />}
+        label={isCertified ? 'Certificata' : 'In attesa'}
+        color={isCertified ? 'success' : 'warning'}
         size="small"
+        className="status-chip"
+        sx={{ fontWeight: 600 }}
       />
     );
   };
@@ -75,7 +79,7 @@ const Categories = () => {
     }
 
     return (
-      <Box>
+      <Box className="fade-in">
         <Typography variant="subtitle2" gutterBottom>
           Campi disponibili:
         </Typography>
@@ -112,7 +116,7 @@ const Categories = () => {
   if (error) {
     return (
       <Box>
-        <Typography variant="h4" gutterBottom>
+        <Typography variant="h3" className="gradient-text" sx={{ fontWeight: 800, mb: 1 }}>
           Categorie
         </Typography>
         <Alert severity="error">{error}</Alert>
@@ -122,12 +126,12 @@ const Categories = () => {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      <Box sx={{ mb: 4 }}>
         <Box>
           <Typography variant="h4" gutterBottom>
             Categorie
           </Typography>
-          <Typography variant="subtitle1" color="textSecondary">
+          <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 400, opacity: 0.8 }}>
             Seleziona una categoria per creare una nuova entità
           </Typography>
         </Box>
@@ -141,28 +145,19 @@ const Categories = () => {
         <Grid container spacing={3}>
           {categories.map((category) => (
             <Grid item xs={12} sm={6} md={4} key={category.id}>
-              <Card
-                sx={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4,
-                  },
-                }}
+              <Card className="modern-card"
+                sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
               >
-                <CardContent sx={{ flexGrow: 1 }}>
+                <CardContent sx={{ flexGrow: 1, p: 3 }}>
                   <Box display="flex" alignItems="center" mb={2}>
-                    <CategoryIcon color="primary" sx={{ mr: 1 }} />
-                    <Typography variant="h6" component="h2">
+                    <Avatar sx={{ width: 48, height: 48, background: 'linear-gradient(135deg, #2196f3, #1976d2)', boxShadow: '0 4px 12px rgba(33, 150, 243, 0.3)', mr: 2 }}><CategoryIcon /></Avatar>
+                    <Typography variant="h6" component="h2" sx={{ fontWeight: 700 }}>
                       {category.name}
                     </Typography>
                   </Box>
 
                   <Box mb={2}>
-                    {getCertificationStatus(category)}
+                    <Box sx={{ position: 'absolute', top: 16, right: 16 }}>{getCertificationStatus(category)}</Box>
                   </Box>
 
                   <Box mb={2}>
@@ -181,11 +176,11 @@ const Categories = () => {
 
                 <CardActions>
                   <Button
-                    size="small"
                     variant="contained"
                     startIcon={<AddIcon />}
                     onClick={() => handleCreateEntity(category.id)}
                     fullWidth
+                    className="modern-button"
                   >
                     Crea Entità
                   </Button>

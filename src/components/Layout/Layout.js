@@ -18,6 +18,7 @@ import {
   MenuItem,
   Chip,
   Divider,
+  Paper,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -196,25 +197,27 @@ const Layout = ({ children, onAuthChange }) => {
         })}
       </List>
 
-      <Box sx={{ p: 2, mt: 'auto' }}>
-        <Box
-          sx={{
-            p: 2,
-            borderRadius: '16px',
-            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1))',
-            border: '1px solid rgba(102, 126, 234, 0.2)',
-            textAlign: 'center'
-          }}
-        >
+      <Paper
+        className="modern-card"
+        sx={{
+          p: 2,
+          mt: 'auto',
+          mx: 2,
+          mb: 2,
+          borderRadius: '16px',
+          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1))',
+          border: '1px solid rgba(102, 126, 234, 0.2)',
+          textAlign: 'center'
+        }}
+      >
           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
             🔐 Certificazione Blockchain
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
             Sicurezza e tracciabilità garantite
           </Typography>
-        </Box>
+        </Paper>
       </Box>
-    </Box>
   );
 
   return (
@@ -262,7 +265,7 @@ const Layout = ({ children, onAuthChange }) => {
                 fontSize: '1.1rem'
               }}
             >
-              Sistema di Certificazione Blockchain
+              Engichain
             </Typography>
             <Typography 
               variant="caption" 
@@ -335,6 +338,7 @@ const Layout = ({ children, onAuthChange }) => {
           >
             <MenuItem 
               onClick={handleLogout}
+              className="modern-button"
               sx={{
                 borderRadius: '12px',
                 mx: 1,

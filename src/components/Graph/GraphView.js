@@ -564,13 +564,13 @@ const GraphView = () => {
   }
 
   return (
-    <Box sx={{ height: isFullscreen ? '100vh' : 'auto' }}>
+    <Box className="fade-in" sx={{ p: 3, height: isFullscreen ? '100vh' : 'auto' }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
-          <Typography variant="h4" gutterBottom>
+          <Typography variant="h3" className="gradient-text" sx={{ fontWeight: 800, mb: 1 }}>
             Grafo delle Relazioni
           </Typography>
-          <Typography variant="subtitle1" color="textSecondary">
+          <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 400, opacity: 0.8 }}>
             Visualizzazione interattiva delle relazioni tra entità
           </Typography>
         </Box>
@@ -607,13 +607,13 @@ const GraphView = () => {
         {/* Controls */}
         {!isFullscreen && (
           <Grid item xs={12} md={3}>
-            <Paper sx={{ p: 2, mb: 2 }}>
+            <Paper className="modern-card" sx={{ p: 3, mb: 2 }}>
               <Typography variant="h6" gutterBottom>
                 Filtri
               </Typography>
               <FormControl fullWidth sx={{ mb: 2 }}>
                 <InputLabel>Categoria</InputLabel>
-                <Select
+                <Select sx={{ borderRadius: '12px' }}
                   value={selectedCategory}
                   label="Categoria"
                   onChange={(e) => setSelectedCategory(e.target.value)}
@@ -636,7 +636,7 @@ const GraphView = () => {
 
             {/* Selected Node Info */}
             {selectedNode && (
-              <Paper sx={{ p: 2 }}>
+              <Paper className="modern-card" sx={{ p: 3 }}>
                 <Typography variant="h6" gutterBottom>
                   Nodo Selezionato
                 </Typography>
@@ -647,7 +647,7 @@ const GraphView = () => {
                   <Chip
                     label={selectedNode.category}
                     size="small"
-                    sx={{ backgroundColor: selectedNode.color, color: 'white' }}
+                    sx={{ backgroundColor: selectedNode.color, color: 'white', borderRadius: '8px', fontWeight: 600 }}
                   />
                 </Box>
                 <Box mb={1}>
@@ -655,6 +655,7 @@ const GraphView = () => {
                     label={selectedNode.blockchainInfoEntities && selectedNode.blockchainInfoEntities.length > 0 ? 'Certificato' : 'Non Certificato'}
                     color={selectedNode.blockchainInfoEntities && selectedNode.blockchainInfoEntities.length > 0 ? 'success' : 'warning'}
                     size="small"
+                    sx={{ borderRadius: '8px', fontWeight: 600 }}
                   />
                 </Box>
                 <Typography variant="body2" color="textSecondary" gutterBottom>
@@ -683,7 +684,7 @@ const GraphView = () => {
                             size="small"
                             variant="outlined"
                             color="success"
-                            sx={{ mt: 0.5, fontSize: '0.7rem', py: 0.25 }}
+                            sx={{ mt: 1, fontSize: '0.7rem', py: 0.5, borderRadius: '8px' }}
                             href={`https://etherscan.io/address/${cert.smartContractAddress}`}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -697,11 +698,12 @@ const GraphView = () => {
                 )}
                 
                 <Button
-                  variant="outlined"
+                  variant="contained"
                   size="small"
                   onClick={() => navigate(`/data/${selectedNode.id}`)}
                   fullWidth
-                  sx={{ mt: 1 }}
+                  className="modern-button"
+                  sx={{ mt: 2 }}
                 >
                   Visualizza Dettagli
                 </Button>
@@ -714,6 +716,7 @@ const GraphView = () => {
         <Grid item xs={12} md={isFullscreen ? 12 : 9}>
           <Paper 
             ref={containerRef} 
+            className="modern-card"
             sx={{ 
               p: 2, 
               position: isFullscreen ? 'fixed' : 'relative', 
@@ -794,7 +797,7 @@ const GraphView = () => {
 
       {/* Legend */}
       {!isFullscreen && graphData.nodes.length > 0 && (
-        <Paper sx={{ p: 2, mt: 2 }}>
+        <Paper className="modern-card" sx={{ p: 3, mt: 2 }}>
           <Typography variant="h6" gutterBottom>
             Legenda
           </Typography>
@@ -811,7 +814,9 @@ const GraphView = () => {
                     size="small"
                     sx={{ 
                       backgroundColor: getCategoryColor(category.id), 
-                      color: 'white' 
+                      color: 'white', 
+                      borderRadius: '8px', 
+                      fontWeight: 600 
                     }}
                   />
                 ))}
@@ -823,14 +828,16 @@ const GraphView = () => {
               </Typography>
               <Box display="flex" gap={1}>
                 <Chip
-                  label="Certificato (bordo verde)"
+                  label="Certificato"
                   color="success"
                   size="small"
+                  sx={{ borderRadius: '8px', fontWeight: 600 }}
                 />
                 <Chip
                   label="Non Certificato"
-                  color="default"
+                  color="warning"
                   size="small"
+                  sx={{ borderRadius: '8px', fontWeight: 600 }}
                 />
               </Box>
             </Grid>

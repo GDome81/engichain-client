@@ -247,15 +247,15 @@ const DataForm = () => {
   }
 
   return (
-    <Box className="form-container">
-      <Typography variant="h4" gutterBottom>
+    <Box className="fade-in" sx={{ p: 3 }}>
+      <Typography variant="h3" className="gradient-text" sx={{ fontWeight: 800, mb: 1 }}>
         {isEdit ? 'Modifica Entità' : 'Crea Nuova Entità'}
       </Typography>
-      <Typography variant="subtitle1" color="textSecondary" gutterBottom>
+      <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 400, opacity: 0.8, mb: 4 }}>
         {isEdit ? 'Modifica i dati dell\'entità esistente' : 'Compila i campi per creare una nuova entità'}
       </Typography>
 
-      <Paper sx={{ p: 3, mt: 3 }}>
+      <Paper className="modern-form" sx={{ p: 4 }}>
         <form onSubmit={handleSubmit(onSubmit)}>
           <Grid container spacing={3}>
             {/* Basic Information */}
@@ -267,16 +267,19 @@ const DataForm = () => {
             
             <Grid item xs={12} md={6}>
               <TextField
-                fullWidth
-                label="Nome Entità"
-                {...register('name')}
-                error={!!errors.name}
-                helperText={errors.name?.message}
-              />
+              {...register('name')}
+              label="Nome Entità"
+              fullWidth
+              required
+              error={!!errors.name}
+              helperText={errors.name?.message}
+              variant="outlined"
+              sx={{ mb: 3 }}
+            />
             </Grid>
             
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth error={!!errors.categoryId}>
+              <FormControl fullWidth required error={!!errors.categoryId} variant="outlined" sx={{ mb: 3 }}>
                 <InputLabel>Categoria</InputLabel>
                 <Select
                   label="Categoria"
@@ -314,29 +317,29 @@ const DataForm = () => {
                   }
                   return (
                     <Grid item xs={12} key={field.id}>
-                      <Card variant="outlined">
+                      <Card className="modern-card" sx={{ mb: 2, p: 2, border: '1px solid #eee' }}>
                         <CardContent>
                           <Grid container spacing={2} alignItems="center">
                             <Grid item xs={12} sm={3}>
                               <TextField
-                                fullWidth
-                                label="Nome Campo"
-                                {...register(`fields.${index}.name`)}
-                                error={!!errors.fields?.[index]?.name}
-                                helperText={errors.fields?.[index]?.name?.message}
-                                disabled={field.isFromCategory}
-                              />
+                      {...register(`fields.${index}.name`)}
+                      label="Nome Campo"
+                      fullWidth
+                      required
+                      error={!!errors.fields?.[index]?.name}
+                      helperText={errors.fields?.[index]?.name?.message}
+                      variant="outlined"
+                    />
                             </Grid>
                             <Grid item xs={12} sm={5}>
                               <TextField
-                                fullWidth
-                                label="Valore"
-                                multiline
-                                rows={2}
-                                {...register(`fields.${index}.value`)}
-                                error={!!errors.fields?.[index]?.value}
-                                helperText={errors.fields?.[index]?.value?.message}
-                              />
+                      {...register(`fields.${index}.value`)}
+                      label="Valore"
+                      fullWidth
+                      error={!!errors.fields?.[index]?.value}
+                      helperText={errors.fields?.[index]?.value?.message}
+                      variant="outlined"
+                    />
                             </Grid>
                             <Grid item xs={12} sm={2}>
                               <TextField
@@ -428,19 +431,24 @@ const DataForm = () => {
               <Divider sx={{ my: 2 }} />
               <Box display="flex" gap={2} justifyContent="flex-end">
                 <Button
-                  variant="outlined"
-                  startIcon={<CancelIcon />}
-                  onClick={handleCancel}
-                  disabled={loading}
-                >
+                variant="outlined"
+                color="secondary"
+                startIcon={<CancelIcon />}
+                onClick={() => navigate('/data')}
+                disabled={loading}
+                sx={{ borderRadius: '12px' }}
+              >
                   Annulla
                 </Button>
                 <Button
-                  type="submit"
-                  variant="contained"
-                  startIcon={<SaveIcon />}
-                  disabled={loading}
-                >
+                type="submit"
+                variant="contained"
+                color="primary"
+                startIcon={<SaveIcon />}
+                disabled={loading}
+                className="modern-button"
+                sx={{ mr: 2 }}
+              >
                   {loading ? (
                     <CircularProgress size={20} color="inherit" />
                   ) : (

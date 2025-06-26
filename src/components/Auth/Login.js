@@ -113,7 +113,7 @@ const Login = ({ onAuthChange }) => {
                 opacity: 0.8
               }}
             >
-              Sistema di Certificazione Blockchain
+              Engichain
             </Typography>
 
             {error && (

@@ -220,17 +220,22 @@ const DataDetail = () => {
   const isCertified = data.blockchainInfoEntities && data.blockchainInfoEntities.length > 0;
 
   return (
-    <Box>
+    <Box className="fade-in" sx={{ p: 3 }}>
       {/* Header */}
       <Box display="flex" alignItems="center" mb={3}>
-        <IconButton onClick={() => navigate('/data')} sx={{ mr: 2 }}>
-          <ArrowBackIcon />
-        </IconButton>
+        <Button
+            variant="outlined"
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/data')}
+            sx={{ mb: 3, borderRadius: '12px' }}
+          >
+            Indietro
+          </Button>
         <Box flexGrow={1}>
-          <Typography variant="h4" gutterBottom>
+          <Typography variant="h3" className="gradient-text" sx={{ fontWeight: 800, mb: 1 }}>
             {data.name}
           </Typography>
-          <Typography variant="subtitle1" color="textSecondary">
+          <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 400, opacity: 0.8 }}>
             Categoria: {data.categoryName}
           </Typography>
         </Box>
@@ -239,11 +244,12 @@ const DataDetail = () => {
 
           {!isCertified && children.length === 0 && (
             <Button
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteIcon />}
-              onClick={() => setShowDeleteDialog(true)}
-            >
+                  variant="outlined"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={() => setShowDeleteDialog(true)}
+                  sx={{ ml: 2, borderRadius: '12px' }}
+                >
               Elimina
             </Button>
           )}
@@ -253,7 +259,7 @@ const DataDetail = () => {
       <Grid container spacing={3}>
         {/* Main Information */}
         <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3, mb: 3 }}>
+          <Paper className="modern-form" sx={{ p: 4, mb: 4 }}>
             <Typography variant="h6" gutterBottom>
               Informazioni Generali
             </Typography>
@@ -303,7 +309,7 @@ const DataDetail = () => {
                 {Object.entries(data.fields).map(([key, value], index) => {
                   return (
                     <Grid item xs={12} sm={6} key={index}>
-                      <Card variant="outlined">
+                      <Card className="modern-card">
                         <CardContent>
                           <Typography variant="subtitle2" color="primary">
                             {key}
@@ -360,9 +366,11 @@ const DataDetail = () => {
               {!isCertified && (
                 <Button
                   variant="contained"
+                  color="primary"
                   startIcon={<SecurityIcon />}
                   onClick={() => setShowCertifyDialog(true)}
-                  fullWidth
+                  disabled={certifying || (data.blockchainInfoEntities && data.blockchainInfoEntities.length > 0)}
+                  className="modern-button"
                 >
                   Certifica su Blockchain
                 </Button>
@@ -397,7 +405,7 @@ const DataDetail = () => {
                 const address = cert.address || cert.smartContractAddress;
 
                 return (
-                  <Card key={index} variant="outlined" sx={{ mb: 2 }}>
+                  <Card className="modern-card" sx={{ mb: 2 }}>
                     <CardContent>
                       <Typography variant="subtitle2" color="success.main" gutterBottom>
                         Certificazione #{index + 1}
