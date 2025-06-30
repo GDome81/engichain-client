@@ -41,8 +41,10 @@ import blockchainService from '../../services/blockchainService';
 import relationshipService from '../../services/relationshipService';
 import categoryService from '../../services/categoryService';
 import { toast } from 'react-toastify';
+import { usePrincipalEntity } from '../../context/PrincipalEntityContext';
 
 const DataDetail = () => {
+  const { principalEntity } = usePrincipalEntity();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [certifying, setCertifying] = useState(false);
@@ -267,7 +269,9 @@ const DataDetail = () => {
     const relationship = {
       from: fromId,
       to: toId,
-      owner: parseInt(id),
+      owner: principalEntity ? principalEntity.id : parseInt(id),
+      label: principalEntity ? principalEntity.name : '',
+      params: {}
     };
 
     try {

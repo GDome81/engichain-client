@@ -36,9 +36,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import dataService from '../../services/dataService';
 import categoryService from '../../services/categoryService';
 import relationshipService from '../../services/relationshipService';
+import { usePrincipalEntity } from '../../context/PrincipalEntityContext';
 import { toast } from 'react-toastify';
+import RelationDialog from './RelationDialog';
 
 const GraphView = () => {
+  const { principalEntity } = usePrincipalEntity();
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -460,8 +463,45 @@ const GraphView = () => {
     }
   };
 
-  const handleAddRelation = (node) => {
-    navigate(`/data/${node.id}`);
+  const handleAddRelation = () => {
+    if (!principalEntity) {
+      toast.error('Seleziona un\'entità principale prima di aggiungere una relazione.');
+      return;
+    }
+    // Filter out the principal entity from the list of available nodes
+    const available = graphData.nodes.filter(n => n.id !== principalEntity.id);
+    setAvailableNodes(available);
+    setShowRelationDialog(true);
+  };
+
+  const handleCreateRelation = async (targetId, label) => {
+    if (!principalEntity) {
+      toast.error('Nessuna entità principale selezionata.');
+      return;
+    }
+
+    const newRelation = {
+      from: principalEntity.id,
+      to: targetId,
+      owner: principalEntity.id,
+      label: label,
+      params: {}
+    };
+
+    console.log('Sending relation data:', newRelation);
+    console.log('Principal entity ID:', principalEntity.id);
+    console.log('Target ID:', targetId);
+
+    try {
+      const result = await relationshipService.createRelationship(newRelation);
+      console.log('Server response:', result);
+      toast.success('Relazione creata con successo!');
+      setShowRelationDialog(false);
+      loadGraphData(); // Reload data to show the new relation
+    } catch (error) { 
+      console.error('Failed to create relation', error);
+      toast.error('Errore nella creazione della relazione.');
+    }
   };
 
   const handleNodeDoubleClick = (node) => {
@@ -564,7 +604,15 @@ const GraphView = () => {
   }
 
   return (
-    <Box className="fade-in" sx={{ p: 3, height: isFullscreen ? '100vh' : 'auto' }}>
+    <>
+      <RelationDialog
+        open={showRelationDialog}
+        onClose={() => setShowRelationDialog(false)}
+        nodes={availableNodes}
+        sourceNode={principalEntity}
+        onCreate={handleCreateRelation}
+      />
+      <Box className="fade-in" sx={{ p: 3, height: isFullscreen ? '100vh' : 'auto' }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
           <Typography variant="h3" className="gradient-text" sx={{ fontWeight: 800, mb: 1 }}>
@@ -848,6 +896,7 @@ const GraphView = () => {
         </Paper>
       )}
     </Box>
+    </>
   );
 };
 

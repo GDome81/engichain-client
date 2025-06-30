@@ -33,6 +33,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import authService from '../../services/authService';
+import { usePrincipalEntity } from '../../context/PrincipalEntityContext';
 import { toast } from 'react-toastify';
 
 const drawerWidth = 280;
@@ -65,6 +66,7 @@ const menuItems = [
 ];
 
 const Layout = ({ children, onAuthChange }) => {
+  const { principalEntity } = usePrincipalEntity();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const navigate = useNavigate();
@@ -277,6 +279,10 @@ const Layout = ({ children, onAuthChange }) => {
               Gestione sicura di entità e relazioni
             </Typography>
           </Box>
+
+          {principalEntity && (
+            <Chip label={`Entità: ${principalEntity.data.name}`} sx={{ mr: 2, backgroundColor: 'white' }} />
+          )}
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <IconButton

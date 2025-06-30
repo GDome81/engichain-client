@@ -5,6 +5,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Amplify } from 'aws-amplify';
+import { PrincipalEntityProvider } from './context/PrincipalEntityContext';
 
 import environment from './config/environment';
 import authService from './services/authService';
@@ -83,6 +84,7 @@ function App() {
 
   return (
     <ThemeProvider theme={theme}>
+      <PrincipalEntityProvider>
       <CssBaseline />
       <Router>
         <div className="App">
@@ -180,6 +182,7 @@ function App() {
           />
         </div>
       </Router>
+      </PrincipalEntityProvider>
     </ThemeProvider>
   );
 }

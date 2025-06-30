@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Auth } from 'aws-amplify';
 import {
   Grid,
   Card,
@@ -29,60 +30,193 @@ import { useNavigate } from 'react-router-dom';
 import dataService from '../../services/dataService';
 import categoryService from '../../services/categoryService';
 import { toast } from 'react-toastify';
-
-const Dashboard = () => {
-  const [stats, setStats] = useState({
-    totalData: 0,
-    certifiedData: 0,
-    pendingData: 0,
-    totalCategories: 0,
-  });
-  const [recentData, setRecentData] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
+import { usePrincipalEntity } from '../../context/PrincipalEntityContext';
+import { Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+ 
+const DashboardWithNavigate = (props) => {
   const navigate = useNavigate();
+  const { principalEntity, selectPrincipalEntity, clearPrincipalEntity } = usePrincipalEntity();
+  return <Dashboard {...props} navigate={navigate} principalEntity={principalEntity} selectPrincipalEntity={selectPrincipalEntity} clearPrincipalEntity={clearPrincipalEntity} />;
+};
+export default DashboardWithNavigate;
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+class Dashboard extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      hasError: false,
+      stats: {
+        totalData: 0,
+        certifiedData: 0,
+        pendingData: 0,
+        totalCategories: 0,
+      },
+      recentData: [],
+      categories: [],
+      loading: true,
+      selectedCategory: '',
+      entities: [],
+      selectedEntity: null,
+    }
+  }
 
-  const loadDashboardData = async () => {
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Uncaught error in Dashboard:", error, errorInfo);
+  }
+
+  componentDidMount() {
+    this.checkAuthAndLoadData();
+  }
+
+  componentDidUpdate(prevProps) {
+    if (this.props.principalEntity !== prevProps.principalEntity) {
+      this.loadDashboardData();
+    }
+  };
+
+  checkAuthAndLoadData = async () => {
     try {
-      setLoading(true);
+      const session = await Auth.currentSession();
+      if (!session) {
+        throw new Error('Sessione non valida');
+      }
+      this.loadDashboardData();
+    } catch (error) {
+      console.error('Error checking auth:', error);
+      if (error.name === 'NoSessionError') {
+        toast.error('Sessione scaduta. Effettua nuovamente il login.');
+        this.props.navigate('/login');
+      } else {
+        toast.error('Errore durante il caricamento dei dati');
+      }
+      this.setState({ loading: false });
+    }
+  };;
+
+  loadDashboardData = async () => {
+    const loadingTimeout = setTimeout(() => {
+      console.log("Loading timeout reached, resetting loading state");
+      this.setState({ loading: false });
+    }, 10000);
+
+    try {
+      console.log("Setting loading to true");
+      this.setState({ loading: true });
       
+      console.log("Fetching categories...");
       const categoriesResponse = await categoryService.getCategories(0, 1000);
-      const categoriesList = categoriesResponse.content || [];
-      setCategories(categoriesList);
+      if (!categoriesResponse || !categoriesResponse.content) {
+        throw new Error('Invalid categories response');
+      }
+      const categoriesList = categoriesResponse.content;
+      console.log("Categories fetched:", categoriesList);
+      this.setState({ categories: categoriesList });
       
-      const dataPromises = categoriesList.map(category => 
+      console.log("Fetching data for categories...");
+      const allDataPromises = categoriesList.map(category => 
         dataService.findDataByCategory(category.id, 0, 1000)
+          .then(response => response?.content || [])
+          .catch(error => {
+            console.error(`Error fetching data for category ${category.name}:`, error);
+            return [];
+          })
       );
-      const dataResponses = await Promise.all(dataPromises);
-      const allData = dataResponses.flatMap(response => response.content || []);
+
+      const allDataResponses = await Promise.all(allDataPromises);
+      const allData = allDataResponses.flat();
+      console.log("All data fetched:", allData.length, "items");
+
+      if (allData.length === 0) {
+        this.setState({
+          recentData: [],
+          stats: {
+            totalData: 0,
+            certifiedData: 0,
+            pendingData: 0,
+            totalCategories: categoriesList.length,
+          },
+        });
+        return;
+      }
 
       const sortedData = [...allData].sort((a, b) => new Date(b.creationDate) - new Date(a.creationDate));
-      setRecentData(sortedData.slice(0, 5));
+      this.setState({ recentData: sortedData.slice(0, 5) });
 
       const totalData = allData.length;
       const certifiedData = allData.filter(d => d.blockchainInfoEntities && d.blockchainInfoEntities.length > 0).length;
       const pendingData = totalData - certifiedData;
 
-      setStats({
-        totalData,
-        certifiedData,
-        pendingData,
-        totalCategories: categoriesList.length,
+      console.log("Setting stats...");
+      this.setState({
+        stats: {
+          totalData,
+          certifiedData,
+          pendingData,
+          totalCategories: categoriesList.length,
+        },
       });
+      console.log("Stats set.");
       
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-      toast.error('Errore nel caricamento dei dati della dashboard');
+      toast.error('Errore nel caricamento dei dati della dashboard: ' + error.message);
+      // Reset dello stato in caso di errore
+      this.setState({
+        categories: [],
+        recentData: [],
+        stats: {
+          totalData: 0,
+          certifiedData: 0,
+          pendingData: 0,
+          totalCategories: 0,
+        },
+      });
     } finally {
-      setLoading(false);
+      clearTimeout(loadingTimeout);
+      console.log("Setting loading to false");
+      this.setState({ loading: false });
     }
-  };
+  };;
+  
 
-  const getStatusChip = (item) => {
+  
+
+  
+
+  loadEntities = async (categoryId) => {
+    if (!categoryId) return;
+    try {
+      const response = await dataService.findDataByCategory(categoryId, 0, 100);
+      const entities = response.content.map(entity => ({ ...entity, data: entity }));
+        this.setState({ entities: entities || [] });
+    } catch (error) {
+      console.error('Error loading entities:', error);
+      toast.error('Errore nel caricamento delle entità per la categoria selezionata.');
+    }
+  };;
+
+  handleCategoryChange = (event) => {
+    const categoryId = event.target.value;
+    this.setState({ selectedCategory: categoryId, selectedEntity: null, entities: [] });
+    this.loadEntities(categoryId);
+  };;
+
+  handleEntityChange = (event) => {
+    const entityId = event.target.value;
+    const entity = this.state.entities.find(e => e.id === entityId);
+    this.setState({ selectedEntity: entity });
+    if(entity) {
+        this.props.selectPrincipalEntity({ ...entity, categoryId: this.state.selectedCategory });
+    } else {
+        this.props.clearPrincipalEntity();
+    }
+  };;
+
+  getStatusChip = (item) => {
     const isCertified = item.blockchainInfoEntities && item.blockchainInfoEntities.length > 0;
     return (
       <Chip
@@ -99,9 +233,9 @@ const Dashboard = () => {
         }}
       />
     );
-  };
+  };;
 
-  const formatDate = (dateString) => {
+  formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('it-IT', {
       year: 'numeric',
       month: 'short',
@@ -109,11 +243,17 @@ const Dashboard = () => {
       hour: '2-digit',
       minute: '2-digit',
     });
-  };
+  };;
 
-  const certificationRate = stats.totalData > 0 ? (stats.certifiedData / stats.totalData) * 100 : 0;
+  render() {
+    if (this.state.hasError) {
+      return <h1>Qualcosa è andato storto.</h1>;
+    }
+    const { loading, stats, recentData, categories, selectedCategory, entities, selectedEntity } = this.state;
+    const { navigate } = this.props;
+    const certificationRate = stats.totalData > 0 ? (stats.certifiedData / stats.totalData) * 100 : 0;
 
-  if (loading) {
+  if (this.state.loading) {
     return (
       <Box className="loading-spinner">
         <CircularProgress size={60} sx={{ color: '#667eea' }} />
@@ -142,6 +282,53 @@ const Dashboard = () => {
         </Typography>
       </Box>
 
+      {/* Principal Entity Selection */}
+      <Paper sx={{ p: 2, mb: 4 }}>
+        <Typography variant="h6" gutterBottom>Selezione Entità Principale</Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth>
+              <InputLabel id="category-select-label">Categoria</InputLabel>
+              <Select
+                labelId="category-select-label"
+                value={selectedCategory}
+                label="Categoria"
+                onChange={this.handleCategoryChange}
+              >
+                {categories.map((category) => (
+                  <MenuItem key={category.id} value={category.id}>
+                    {category.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth disabled={!selectedCategory}>
+              <InputLabel id="entity-select-label">Entità Principale</InputLabel>
+              <Select
+                labelId="entity-select-label"
+                value={selectedEntity ? selectedEntity.id : ''}
+                label="Entità Principale"
+                onChange={this.handleEntityChange}
+              >
+                {entities.map((entity) => (
+                  <MenuItem key={entity.id} value={entity.id}>
+                    {entity.data.name || entity.id} 
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+        </Grid>
+        {this.state.selectedEntity && (
+            <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(102, 126, 234, 0.1)', borderRadius: 1 }}>
+                <Typography variant="subtitle1">Entità Principale Selezionata:</Typography>
+                <Typography variant="body1" fontWeight="bold">{this.state.selectedEntity.data.name || this.state.selectedEntity.id}</Typography>
+            </Box>
+        )}
+      </Paper>
+
       {/* Statistics Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex' }}>
@@ -160,7 +347,7 @@ const Dashboard = () => {
                     variant="h3" 
                     sx={{ fontWeight: 800, color: '#667eea' }}
                   >
-                    {stats.totalData}
+                    {this.state.stats.totalData}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
                     <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main', mr: 0.5 }} />
@@ -200,7 +387,7 @@ const Dashboard = () => {
                     variant="h3" 
                     sx={{ fontWeight: 800, color: '#4caf50' }}
                   >
-                    {stats.certifiedData}
+                    {this.state.stats.certifiedData}
                   </Typography>
                   <Box sx={{ mt: 1 }}>
                     <LinearProgress
@@ -252,7 +439,7 @@ const Dashboard = () => {
                     variant="h3" 
                     sx={{ fontWeight: 800, color: '#ff9800' }}
                   >
-                    {stats.pendingData}
+                    {this.state.stats.pendingData}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
                     <SpeedIcon sx={{ fontSize: 16, color: 'warning.main', mr: 0.5 }} />
@@ -292,7 +479,7 @@ const Dashboard = () => {
                     variant="h3" 
                     sx={{ fontWeight: 800, color: '#2196f3' }}
                   >
-                    {stats.totalCategories}
+                    {this.state.stats.totalCategories}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
                     <SecurityIcon sx={{ fontSize: 16, color: 'info.main', mr: 0.5 }} />
@@ -332,7 +519,7 @@ const Dashboard = () => {
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={() => navigate('/data/new')}
+                onClick={() => this.props.navigate('/data/new')}
                 fullWidth
                 className="modern-button"
                 sx={{
@@ -355,7 +542,7 @@ const Dashboard = () => {
               <Button
                 variant="outlined"
                 startIcon={<DataIcon />}
-                onClick={() => navigate('/data')}
+                onClick={() => this.props.navigate('/data')}
                 fullWidth
                 sx={{
                   py: 1.5,
@@ -377,7 +564,7 @@ const Dashboard = () => {
               <Button
                 variant="outlined"
                 startIcon={<CategoryIcon />}
-                onClick={() => navigate('/categories')}
+                onClick={() => this.props.navigate('/categories')}
                 fullWidth
                 sx={{
                   py: 1.5,
@@ -410,9 +597,9 @@ const Dashboard = () => {
             >
               📋 Entità Recenti
             </Typography>
-            {recentData.length > 0 ? (
+            {this.state.recentData.length > 0 ? (
               <List sx={{ p: 0 }}>
-                {recentData.map((item, index) => (
+                {this.state.recentData.map((item, index) => (
                   <ListItem
                     key={item.id}
                     className="modern-card"
@@ -427,7 +614,7 @@ const Dashboard = () => {
                         boxShadow: '0 12px 32px rgba(0, 0, 0, 0.15)',
                       },
                     }}
-                    onClick={() => navigate(`/data/${item.id}`)}
+                    onClick={() => this.props.navigate(`/data/${item.id}`)}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
                       <Avatar
@@ -451,7 +638,7 @@ const Dashboard = () => {
                               >
                                 {item.name}
                               </Typography>
-                              {getStatusChip(item)}
+                              {this.getStatusChip(item)}
                             </Box>
                           }
                           secondary={
@@ -468,7 +655,7 @@ const Dashboard = () => {
                                 color="text.secondary"
                                 sx={{ display: 'block', mt: 0.5 }}
                               >
-                                🕒 Creato: {formatDate(item.creationDate)}
+                                🕒 Creato: {this.formatDate(item.creationDate)}
                               </Typography>
                             </Box>
                           }
@@ -506,7 +693,7 @@ const Dashboard = () => {
                 <Button
                   variant="contained"
                   startIcon={<AddIcon />}
-                  onClick={() => navigate('/data/new')}
+                  onClick={() => this.props.navigate('/data/new')}
                   className="modern-button"
                   sx={{
                     background: 'linear-gradient(135deg, #667eea, #764ba2)',
@@ -526,6 +713,9 @@ const Dashboard = () => {
       </Grid>
     </Box>
   );
-};
 
-export default Dashboard;
+
+
+ 
+
+  }}
